@@ -11,16 +11,16 @@ my $builder = Module::Build->new(
 	     'Getopt::Long' => 2.34,
 	     'Pod::Usage' => 0,
 	     'Data::Dumper' => 0,
+	     'Pod::Select' => 0,
+	     'Pod::Text' => 0,
+	     'IO::String' => 0,
 	},
     build_requires => {
         'Test::More' => 0,
     },
     script_files      => [ 'scripts/moddevaid' ],
-    add_to_cleanup      => [ 'Module-DevAid-*' ],
+    #add_to_cleanup      => [ 'Module-DevAid-*' ],
+    create_makefile_pl => 'traditional',
 );
 
 $builder->create_build_script();
-# create the Makefile.PL 
-use Module::Build::Compat;
-print "creating Makefile.PL\n";
-Module::Build::Compat->create_makefile_pl('passthrough', $builder);

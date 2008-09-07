@@ -1,6 +1,6 @@
 ---
 name: Module-DevAid
-version: 0.2201
+version: 0.2303
 author:
   - Kathryn Andersen
 abstract: tools to aid perl module developers
@@ -10,14 +10,17 @@ resources:
 requires:
   Data::Dumper: 0
   Getopt::Long: 2.34
+  IO::String: 0
+  Pod::Select: 0
+  Pod::Text: 0
   Pod::Usage: 0
 build_requires:
   Test::More: 0
 provides:
   Module::DevAid:
     file: lib/Module/DevAid.pm
-    version: 0.2201
-generated_by: Module::Build version 0.2805
+    version: 0.2303
+generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html
   version: 1.2

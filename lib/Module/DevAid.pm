@@ -2,22 +2,17 @@ package Module::DevAid;
 use strict;
 use warnings;
 
-BEGIN {
-    use Exporter;
-    our @ISA = qw(Exporter);
-}
-
 =head1 NAME
 
 Module::DevAid - tools to aid perl module developers
 
 =head1 VERSION
 
-This describes version B<0.2201> of Module::DevAid.
+This describes version B<0.2303> of Module::DevAid.
 
 =cut
 
-our $VERSION = '0.2201';
+our $VERSION = '0.2303';
 
 =head1 SYNOPSIS
 
@@ -39,7 +34,7 @@ Module (and script) to aid with development, by helping (and testing)
 auto-building of certain files, and with the steps needed in building and
 committing a release.
 
-At this point this only uses the darcs revision system.
+At this point this only uses the darcs or svk revision systems.
 
 Takes a project description, either through the command line options, or
 via a project config file, which defaults to 'mod_devaid.conf' in
@@ -59,7 +54,7 @@ generates a TODO file from a devtodo .todo file
 
 =item *
 
-auto-updates a Changes file from "darcs changes" list
+auto-updates a Changes file from the revision-control system's change log.
 
 =item *
 
@@ -67,7 +62,7 @@ auto-changes version-id in module and script files
 
 =item *
 
-does all of the above and tags commits in darcs for a release
+does all of the above and tags commits for a release
 
 =back
 
@@ -174,11 +169,22 @@ Name of the TODO file to be generated. (default: TODO)
 
 The file from which to take the version.  The version should be in the form
 of a standard VERSION id: I<number>.I<number> on a line by itself.
+Optionally, it can be I<number>.I<number> followed by a general id,
+for example 2.03_rc1
 (default: version.txt)
+
+=item version_control => I<string>
+
+Which version-control system is being used.  The options are 'darcs'
+and 'svk'.  (default: darcs)
+The version control system is used for listing and committing changes.
 
 =back
 
 =cut
+use Pod::Select;
+use Pod::Text;
+use IO::String;
 
 sub new {
     my $class = shift;
@@ -195,6 +201,7 @@ sub new {
     }
 
     # set the defaults if not already set
+    $self->{version_control} ||= 'darcs';
     $self->{pod_file} ||= $self->{modules}->[0];
     $self->{commit_todo} ||= 0;
     $self->{gen_readme} ||= 0;
@@ -206,6 +213,8 @@ sub new {
     $self->{old_version_file} ||= 'old_version.txt';
     $self->{version_bump_files} ||= [];
     $self->{scripts} ||= [];
+    $self->{pod_sel} = new Pod::Select();
+    $self->{pod_text} = Pod::Text->new(alt=>1,indent=>0);
     return $self;
 } # new
 
@@ -293,13 +302,13 @@ sub config_read {
     return 1;
 }
 
-=head2 darcs_release
+=head2 do_release
 
 Do a release, using darcs as the revision control system.
 
 =cut
 
-sub darcs_release {
+sub do_release {
     my $self = shift;
 
     my $old_version = $self->get_old_version();
@@ -347,7 +356,7 @@ sub darcs_release {
 	my $command = "darcs dist -d $dist_rel_name-$version";
 	system($command);
     }
-} # darcs_release
+} # do_release
 
 =head2 version_bump
 
@@ -375,12 +384,12 @@ sub version_bump {
     my $command;
     if (@files)
     {
-	$command = 'perl -pi -e "/VERSION\s+=\s+\'[0-9]/ && s/VERSION\s+=\s+\'[0-9]+\.[0-9]+\''
+	$command = 'perl -pi -e "/VERSION\s+=\s+\'\d/ && s/VERSION\s+=\s+\'\d+\.\d+\w*\''
 	    . "/VERSION = '${version}'/\" " . 
 	    join(' ', @files);
 	system($command);
 
-	$command = 'perl -pi -e \'/^This describes version/ && s/B<[0-9]+[.][0-9]+>'
+	$command = 'perl -pi -e \'/^This describes version/ && s/B<\d+[.]\d+\w*>'
 	    . "/B<$version>/' " .
 	    join(' ', @files);
 	system($command);
@@ -404,9 +413,15 @@ sub version_bump {
 	close(OVFILE);
     }
 
-    if ($do_commit)
+    if ($do_commit && $self->{version_control} eq 'darcs')
     {
 	$command = "darcs record -am 'bump version to $version' $old_version_file $version_file "
+	    . join(' ', @files, @{$self->{version_bump_files}});
+	system($command);
+    }
+    elsif ($do_commit && $self->{version_control} eq 'svk')
+    {
+	$command = "svk commit -m 'bump version to $version' $old_version_file $version_file "
 	    . join(' ', @files, @{$self->{version_bump_files}});
 	system($command);
     }
@@ -462,9 +477,14 @@ sub generate_todo_file {
 	    close(OTFILE);
 	    print "generated $todo_file\n";
 	}
-	if ($do_commit)
+	if ($do_commit && $self->{version_control} eq 'darcs')
 	{
 	    my $command = "darcs record -am 'generate TODO file' $todo_file";
+	    system($command);
+	}
+	elsif ($do_commit && $self->{version_control} eq 'svk')
+	{
+	    my $command = "svk commit -m 'generate TODO file' $todo_file";
 	    system($command);
 	}
     }
@@ -482,8 +502,24 @@ sub get_readme_content {
     my $self = shift;
 
     my $pod_file = $self->{pod_file};
-    my $readme_str = `podselect -section NAME -section VERSION -section DESCRIPTION -section INSTALLATION -section CONTENTS -section "REQUIRES|PREREQUISITES" -section AUTHOR -section SUPPORT -section "COPYRIGHT.*|LICENCE|LICENSE" $pod_file | pod2text --alt -i 0 - `;
-    return $readme_str;
+    $self->{pod_sel}->select('NAME','VERSION','DESCRIPTION',
+			     'INSTALLATION','CONTENTS','REQUIRES|PREREQUISITES',
+			     'AUTHOR','SUPPORT','COPYRIGHT.*|LICENCE|LICENSE');
+    my $readme_pod;
+    my $io_pod = IO::String->new($readme_pod);
+    my $pod_file_fh;
+    open($pod_file_fh, $pod_file) or die "Could not open $pod_file";
+    $self->{pod_sel}->parse_from_filehandle($pod_file_fh, $io_pod);
+
+    # reset the handle to zero so it can be read from
+    $io_pod->setpos(0);
+
+    my $readme_txt;
+    my $io_txt = IO::String->new($readme_txt);
+
+    $self->{pod_text}->parse_from_filehandle($io_pod, $io_txt);
+
+    return $readme_txt;
 }
 
 =head2 generate_readme_file
@@ -507,9 +543,14 @@ sub generate_readme_file {
 	print RMFILE $readme_str;
 	close (RMFILE);
 	print "generated $readme_file\n";
-	if ($do_commit)
+	if ($do_commit && $self->{version_control} eq 'darcs')
 	{
 	    my $command = "darcs record -am 'generate README file' $readme_file";
+	    system($command);
+	}
+	elsif ($do_commit && $self->{version_control} eq 'svk')
+	{
+	    my $command = "svk commit -m 'generate README file' $readme_file";
 	    system($command);
 	}
     }
@@ -517,8 +558,8 @@ sub generate_readme_file {
 
 =head2 get_new_changes
 
-Get the changes committed to darcs since the last release.
-Generate a more compact format than the darcs changes default.
+Get the changes committed since the last release.
+Generate a more compact format than the default.
 
 =cut
 
@@ -526,45 +567,14 @@ sub get_new_changes {
     my $self = shift;
     my $old_version = shift;
 
-    my $command = "darcs changes --from-patch release-$old_version";
-    my $new_changes = '';
-    if (!`$command`) # check the command works
+    my $new_changes;
+    if ($self->{version_control} eq 'darcs')
     {
-	$command = 'darcs changes';
+	$new_changes = $self->get_new_darcs_changes($old_version);
     }
-    if (open(CFILE, "$command |"))
+    elsif ($self->{version_control} eq 'svk')
     {
-	my $cdate = '';
-	while (my $line = <CFILE>)
-	{
-	    # filter out the tagged release bit
-	    if ($line =~ /^\s*tagged\s+release/)
-	    {
-	    }
-	    # grab the date parts
-	    elsif ($line =~ /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+([a-zA-Z]+)\s+(\d+)\s+\d\d:\d\d:\d\d\s+\w+\s+(\d+)/)
-	    {
-		my $month = $2;
-		my $day = $3;
-		my $year = $4;
-		$cdate = "$day $month $year";
-	    }
-	    elsif ($line =~ /\s+\*\s+/) # item start
-	    {
-		# stick the date in
-		$line =~ s/(\s+\*\s+)/$1\($cdate\) /;
-		$new_changes .= $line;
-	    }
-	    else
-	    {
-		$new_changes .= $line;
-	    }
-	}
-	close CFILE;
-    }
-    if (!$new_changes) # get ALL the changes if that failed
-    {
-	$new_changes = `darcs changes`;
+	$new_changes = $self->get_new_svk_changes($old_version);
     }
     return $new_changes;
 }
@@ -669,7 +679,7 @@ sub get_new_version {
     {
 	while (my $line = <NVFILE>)
 	{
-	    if ($line =~ /^([0-9]+\.[0-9]+)$/)
+	    if ($line =~ /^(\d+\.\d+\w*)$/)
 	    {
 		eval "\$version = '$1';";
 		last;
@@ -685,9 +695,172 @@ sub get_new_version {
 These are documented for the developer only, and are not meant
 to be used by the outside.
 
+=head2 get_new_darcs_changes
+
+Get the changes committed to darcs since the last release.
+Generate a more compact format than the darcs changes default.
+
+=cut
+
+sub get_new_darcs_changes {
+    my $self = shift;
+    my $old_version = shift;
+
+    my $command = "darcs changes --from-patch release-$old_version";
+    my $new_changes = '';
+    if (!`$command`) # check the command works
+    {
+	$command = 'darcs changes';
+    }
+    if (open(CFILE, "$command |"))
+    {
+	my $cdate = '';
+	while (my $line = <CFILE>)
+	{
+	    # filter out the tagged release bit
+	    if ($line =~ /^\s*tagged\s+release/)
+	    {
+	    }
+	    # grab the date parts
+	    elsif ($line =~ /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+([a-zA-Z]+)\s+(\d+)\s+\d\d:\d\d:\d\d\s+\w+\s+(\d+)/)
+	    {
+		my $month = $2;
+		my $day = $3;
+		my $year = $4;
+		$cdate = "$day $month $year";
+	    }
+	    elsif ($line =~ /\s+\*\s+/) # item start
+	    {
+		# stick the date in
+		$line =~ s/(\s+\*\s+)/$1\($cdate\) /;
+		$new_changes .= $line;
+	    }
+	    else
+	    {
+		$new_changes .= $line;
+	    }
+	}
+	close CFILE;
+    }
+    if (!$new_changes) # get ALL the changes if that failed
+    {
+	$new_changes = `darcs changes`;
+    }
+    return $new_changes;
+} # get_new_darcs_changes
+
+=head2 get_new_svk_changes
+
+Get the changes committed to svk since the last release.
+Generate a more compact format than the svk changes default.
+
+=cut
+
+sub get_new_svk_changes {
+    my $self = shift;
+    my $old_version = shift;
+
+    # find out the version of the most recent tag
+    my $info_cmd = "svk info";
+    my $fh;
+    my $depot_path = '';
+    my $local_last_rev = '';
+    if (open($fh, "$info_cmd |"))
+    {
+	while (my $line = <$fh>)
+	{
+	    if ($line =~ /Depot Path:\s+(.*)/)
+	    {
+		$depot_path = $1;
+	    }
+	    elsif ($line =~ /Last Changed Rev.:\s*(\d+)/)
+	    {
+		$local_last_rev = $1;
+	    }
+	}
+	close $fh;
+    }
+    my $tags_path = $depot_path;
+    $tags_path =~ s/trunk/tags/;
+
+    $info_cmd = "svk info $tags_path";
+    my $tags_last_rev = '';
+    if (open($fh, "$info_cmd |"))
+    {
+	while (my $line = <$fh>)
+	{
+	    if ($line =~ /Last Changed Rev.:\s*(\d+)/)
+	    {
+		$tags_last_rev = $1;
+	    }
+	}
+	close $fh;
+    }
+    my $new_changes = '';
+
+    my $command = "svk log -r HEAD:$tags_last_rev";
+    # if the local change is older than the tag change,
+    # there are no changes; fall back to all changes.
+    if ($local_last_rev < $tags_last_rev)
+    {
+	$command = 'svk log';
+    }
+    if (!`$command`) # check the command works
+    {
+	$command = 'svk log';
+    }
+    if (open(CFILE, "$command |"))
+    {
+	my $cdate = '';
+	my $item = '';
+	while (my $line = <CFILE>)
+	{
+	    # filter out the tagged release bit
+	    if ($line =~ /^\s*tagged\s+release/)
+	    {
+	    }
+	    # grab the date parts
+	    elsif ($line =~ /^r\d+:\s+\w+\s+\|\s+(\d\d\d\d-\d+-\d+)/)
+	    {
+		$cdate = $1;
+		$item = '';
+	    }
+	    elsif ($line =~ /----------/) # item start or end
+	    {
+		if ($item) # end
+		{
+		    $new_changes .= "  * ($cdate) $item";
+		}
+	    }
+	    elsif ($line =~ /^$/) # blank
+	    {
+		$item .= $line if $item;
+	    }
+	    else
+	    {
+		if ($item)
+		{
+		    $item .= "    $line"; # alignment
+		}
+		else
+		{
+		    $item .= $line;
+		}
+	    }
+	}
+	close CFILE;
+	$new_changes .= "\n" if $new_changes;
+    }
+    if (!$new_changes) # get ALL the changes if that failed
+    {
+	$new_changes = `svk log`;
+    }
+    return $new_changes;
+} # get_new_svk_changes
+
 =head2 update_changes_file
 
-Called by darcs_release.  Overwrites the changes file and commits
+Called by do_release.  Overwrites the changes file and commits
 the change. (uses get_changes_content)
 
 =cut
@@ -704,13 +877,21 @@ sub update_changes_file {
 	print OCFILE $changes_str;
 	close(OCFILE);
     }
-    my $command = "darcs record -am 'update release notes' $changes_file";
-    system($command);
+    if ($self->{version_control} eq 'darcs')
+    {
+	my $command = "darcs record -am 'update release notes' $changes_file";
+	system($command);
+    }
+    elsif ($self->{version_control} eq 'svk')
+    {
+	my $command = "svk commit -m 'update release notes' $changes_file";
+	system($command);
+    }
 }
 
 =head2 tag_release
 
-Called by darcs_release.  Tags the release in darcs.
+Called by do_release.  Tags the release.
 
 =cut
 
@@ -718,8 +899,33 @@ sub tag_release {
     my $self = shift;
     my $version = shift;
 
-    my $command = "darcs tag -m release-$version --checkpoint";
-    system($command);
+    if ($self->{version_control} eq 'darcs')
+    {
+	my $command = "darcs tag -m release-$version --checkpoint";
+	system($command);
+    }
+    elsif ($self->{version_control} eq 'svk')
+    {
+	# find the tag path
+	my $info_cmd = "svk info";
+	my $fh;
+	my $depot_path = '';
+	if (open($fh, "$info_cmd |"))
+	{
+	    while (my $line = <$fh>)
+	    {
+		if ($line =~ /Depot Path:\s+(.*)/)
+		{
+		    $depot_path = $1;
+		}
+	    }
+	    close $fh;
+	}
+	my $tags_path = $depot_path;
+	$tags_path =~ s/trunk/tags/;
+	my $command = "svk copy -p -m release-$version $depot_path $tags_path/v$version";
+	system($command);
+    }
 } # tag_release
 
 =head1 REQUIRES

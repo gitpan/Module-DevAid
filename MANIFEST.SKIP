@@ -11,6 +11,11 @@
 # the TODO file
 ^\.todo$
 
+# DevAid files
+^darcs_prebuild.pl$
+^old_version.txt$
+^version.txt$
+
 # MakeMaker files
 ^Makefile$
 ^blib/

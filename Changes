@@ -1,6 +1,36 @@
 Revision history for Module::DevAid
 ===================================
 
+0.2303 Sun 07 September 2008
+----------------------------
+
+  * (2008-09-07) Er, updated documentation.
+
+0.2302 Sun 07 September 2008
+----------------------------
+
+  * (2008-09-07) Making the SVK version do the tagging copy.
+
+0.2301 Sun 07 September 2008
+----------------------------
+
+  * (2008-09-07) Improving the formatting of multi-line SVK change info.
+  * (2008-09-07) Improving the SVK list-of-changes detection.
+    Assumes that the depot is using "trunk" and "tags".
+
+0.23 Sun 07 September 2008
+--------------------------
+
+  * (2008-09-07) Make traditional Makefile.PL not passthrough.
+  * (2008-09-07) First pass at getting this working with SVK.
+
+0.2202 Wed 21st November 2007
+-----------------------------
+
+  * (13 Jun 2007) Fixed bug with README generation
+  * (13 Jun 2007) Changed build dependencies
+  * (21 Nov 2007) Fixed bug with version-changing
+
 0.2201 Sun 17 June 2007
 -----------------------
 

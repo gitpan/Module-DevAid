@@ -6,7 +6,7 @@ Module::DevAid - tools to aid perl module developers
 
 ==== VERSION ====
 
-This describes version ``0.2201'' of Module::DevAid.
+This describes version ``0.2303'' of Module::DevAid.
 
 
 ==== DESCRIPTION ====
@@ -15,7 +15,7 @@ Module (and script) to aid with development, by helping (and testing)
 auto-building of certain files, and with the steps needed in building and
 committing a release.
 
-At this point this only uses the darcs revision system.
+At this point this only uses the darcs or svk revision systems.
 
 Takes a project description, either through the command line options, or via
 a project config file, which defaults to 'mod_devaid.conf' in the current
@@ -30,13 +30,13 @@ generates a README file from POD
 generates a TODO file from a devtodo .todo file
 
 *
-auto-updates a Changes file from "darcs changes" list
+auto-updates a Changes file from the revision-control system's change log.
 
 *
 auto-changes version-id in module and script files
 
 *
-does all of the above and tags commits in darcs for a release
+does all of the above and tags commits for a release
 
 
 ==== REQUIRES ====

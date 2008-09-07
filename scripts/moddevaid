@@ -8,11 +8,11 @@ moddevaid - script to interface to the Module::DevAid module
 
 =head1 VERSION
 
-This describes version B<0.2201> of moddevaid.
+This describes version B<0.2303> of moddevaid.
 
 =cut
 
-our $VERSION = '0.2201';
+our $VERSION = '0.2303';
 
 =head1 SYNOPSIS
 
@@ -21,6 +21,7 @@ moddevaid [--changes_file I<filename> ] [ --commit_todo ]
 [ --gen_todo | --nogen_todo ] { --modules I<filename> }
 [ --pod_file I<filename> ] [ --readme_file I<filename> ]
 { --scripts I<filename> } [ --todo_file I<filename> ]
+[ --version_control I<string> ]
 [ --version_file I<filename> ] [ --old_version_file I<filename> ]
 I<command>
 
@@ -34,7 +35,7 @@ Script to aid with development, by helping (and testing) auto-building
 of certain files, and with the steps needed in building and committing
 a release.
 
-At this point this only uses the darcs revision system.
+At this point this uses the darcs or svk revision systems.
 
 Takes a project description, either through the command line options, or
 via a project config file. (see L<CONFIG FILE> for more information).
@@ -50,7 +51,7 @@ Name of the Changes file to be generated. (default: Changes)
 =item --commit_todo
 
 Should we commit the TODO file we generated?  If true, then will
-attempt to do a darcs commit on the generated TODO file.  This needs
+attempt to do a commit on the generated TODO file.  This needs
 to be an option because some setups need the TODO file (as well as the
 .todo file) to be under revision control, and others don't.
 (see L<--gen_todo>) (default: false)
@@ -105,10 +106,18 @@ option.
 
 Name of the TODO file to be generated. (default: TODO)
 
+=item --version_control I<string>
+
+Which version-control (revision control) system is being used.  The options are
+'darcs' and 'svk'.  The version control system is used for listing and
+committing changes.  (default: darcs)
+
 =item --version_file I<filename>
 
 The file from which to take the version.  The version should be in the form
 of a standard VERSION id: I<number>.I<number> on a line by itself.
+Optionally, it can be I<number>.I<number> followed by a general id,
+for example 2.03_rc1
 (default: version.txt)
 
 =back
@@ -126,7 +135,7 @@ what the script thinks the settings are.
 
 =item CHANGES
 
-Show what the Changes file generated from darcs changes would be like.
+Show what the Changes file generated from the change-log would be like.
 
 =item LIST
 
@@ -156,11 +165,11 @@ okay.
 
 When making a release do the following:
 
-1. Check for unrecorded changes: "darcs whatsnew -s" and/or
-"darcs whatsnew -ls" and commit them.
+1. Check for unrecorded changes:
+"darcs whatsnew -s" and/or "darcs whatsnew -ls" or "svk status"
+and commit them.
 
-2. If darcs test isn't set, check that the tests pass: "Build test".
-(If darcs test is set, the tests will have been run on commits)
+2. Check that the tests pass: "Build test".
 
 3. Update version.txt (can't automate this since it requires a
 human decision as to what the next version number is).
@@ -266,6 +275,7 @@ MAIN: {
 	       "scripts=s@",
 	       "todo_file=s",
 	       "version_file=s",
+	       "version_control=s",
 	       "old_version_file=s",
 	      ) or pod2usage(2);
 
@@ -304,7 +314,7 @@ SWITCH: for (1) {
 		last;
 	    };
 	    ($command =~ /^RELEASE$/i) && do {
-		$mda->darcs_release();
+		$mda->do_release();
 		last;
 	    };
 	}
