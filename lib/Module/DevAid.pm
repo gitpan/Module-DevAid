@@ -8,11 +8,11 @@ Module::DevAid - tools to aid perl module developers
 
 =head1 VERSION
 
-This describes version B<0.2303> of Module::DevAid.
+This describes version B<0.24> of Module::DevAid.
 
 =cut
 
-our $VERSION = '0.2303';
+our $VERSION = '0.24';
 
 =head1 SYNOPSIS
 

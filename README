@@ -6,7 +6,7 @@ Module::DevAid - tools to aid perl module developers
 
 ==== VERSION ====
 
-This describes version ``0.2303'' of Module::DevAid.
+This describes version 0.24 of Module::DevAid.
 
 
 ==== DESCRIPTION ====
@@ -23,20 +23,16 @@ directory.
 
 Features:
 
-*
-generates a README file from POD
+*   generates a README file from POD
 
-*
-generates a TODO file from a devtodo .todo file
+*   generates a TODO file from a devtodo .todo file
 
-*
-auto-updates a Changes file from the revision-control system's change log.
+*   auto-updates a Changes file from the revision-control system's change
+    log.
 
-*
-auto-changes version-id in module and script files
+*   auto-changes version-id in module and script files
 
-*
-does all of the above and tags commits for a release
+*   does all of the above and tags commits for a release
 
 
 ==== REQUIRES ====

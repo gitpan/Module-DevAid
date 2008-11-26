@@ -1,6 +1,12 @@
 Revision history for Module::DevAid
 ===================================
 
+0.24 Tue 18 November 2008
+-------------------------
+
+  * (2008-11-18) No longer archiving certain auto-generated files.
+  * (2008-11-18) Added Getopt:;ArgvFile to enable options files.
+
 0.2303 Sun 07 September 2008
 ----------------------------
 
